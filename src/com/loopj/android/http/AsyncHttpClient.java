@@ -101,6 +101,7 @@ public class AsyncHttpClient {
 
     private static int maxConnections = DEFAULT_MAX_CONNECTIONS;
     private static int socketTimeout = DEFAULT_SOCKET_TIMEOUT;
+    private static int maxRetries = DEFAULT_MAX_RETRIES;
 
     private final DefaultHttpClient httpClient;
     private final HttpContext httpContext;
@@ -163,12 +164,20 @@ public class AsyncHttpClient {
             }
         });
 
-        httpClient.setHttpRequestRetryHandler(new RetryHandler(DEFAULT_MAX_RETRIES));
+        httpClient.setHttpRequestRetryHandler(new RetryHandler(maxRetries));
 
         threadPool = (ThreadPoolExecutor)Executors.newCachedThreadPool();
 
         requestMap = new WeakHashMap<Context, List<WeakReference<Future<?>>>>();
         clientHeaderMap = new HashMap<String, String>();
+    }
+    
+    public static void setDefaultMaxRetries(int number) {
+    	maxRetries = number;
+    }
+    
+    public static void setDefaultSocketTimeout(int number) {
+    	socketTimeout = number;
     }
 
     /**

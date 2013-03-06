@@ -25,6 +25,7 @@ package com.loopj.android.http;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.net.ConnectException;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.HashSet;
@@ -38,8 +39,11 @@ import org.apache.http.protocol.ExecutionContext;
 import org.apache.http.protocol.HttpContext;
 
 import android.os.SystemClock;
+import android.util.Log;
 
 class RetryHandler implements HttpRequestRetryHandler {
+	private static final String LOG_TAG = "http";
+	
     private static final int RETRY_SLEEP_TIME_MILLIS = 1500;
     private static HashSet<Class<?>> exceptionWhitelist = new HashSet<Class<?>>();
     private static HashSet<Class<?>> exceptionBlacklist = new HashSet<Class<?>>();
@@ -51,6 +55,8 @@ class RetryHandler implements HttpRequestRetryHandler {
         exceptionWhitelist.add(UnknownHostException.class);
         // retry-this, since it may happens as part of a Wi-Fi to 3G failover
         exceptionWhitelist.add(SocketException.class);
+        // lossy 2G network
+        exceptionWhitelist.add(ConnectException.class);
 
         // never retry timeouts
         exceptionBlacklist.add(InterruptedIOException.class);
@@ -69,10 +75,12 @@ class RetryHandler implements HttpRequestRetryHandler {
 
         Boolean b = (Boolean) context.getAttribute(ExecutionContext.HTTP_REQ_SENT);
         boolean sent = (b != null && b.booleanValue());
+        Log.d(LOG_TAG, "retry request...");
 
         if(executionCount > maxRetries) {
             // Do not retry if over max retry count
             retry = false;
+            Log.d(LOG_TAG, "maxRetries!");
         } else if (exceptionBlacklist.contains(exception.getClass())) {
             // immediately cancel retry if the error is blacklisted
             retry = false;
@@ -81,10 +89,10 @@ class RetryHandler implements HttpRequestRetryHandler {
             retry = true;
         } else if (!sent) {
             // for most other errors, retry only if request hasn't been fully sent yet
-            retry = true;
+        	retry = true;
         } else {
             // resend all idempotent requests
-            HttpUriRequest currentReq = (HttpUriRequest) context.getAttribute(ExecutionContext.HTTP_REQUEST);
+        	HttpUriRequest currentReq = (HttpUriRequest) context.getAttribute(ExecutionContext.HTTP_REQUEST);
             String requestType = currentReq.getMethod();
             if(!requestType.equals("POST")) {
                 retry = true;
@@ -99,7 +107,7 @@ class RetryHandler implements HttpRequestRetryHandler {
         } else {
             exception.printStackTrace();
         }
-
+        
         return retry;
     }
 }
