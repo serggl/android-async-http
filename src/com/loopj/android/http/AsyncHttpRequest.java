@@ -20,6 +20,8 @@ package com.loopj.android.http;
 
 import java.io.IOException;
 import java.net.ConnectException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 
 import org.apache.http.HttpResponse;
@@ -92,11 +94,22 @@ class AsyncHttpRequest implements Runnable {
             try {
                 makeRequest();
                 return;
-	    } catch (UnknownHostException e) {
-	        if(responseHandler != null) {
-	            responseHandler.sendFailureMessage(e, "can't resolve host");
-		}
-		return;
+            } catch (UnknownHostException e) {
+		        if(responseHandler != null) {
+		            responseHandler.sendFailureMessage(e, "can't resolve host");
+		        }
+	        	return;
+            }catch (SocketException e){
+                // Added to detect host unreachable
+                if(responseHandler != null) {
+                    responseHandler.sendFailureMessage(e, "can't resolve host");
+                }
+                return;
+            }catch (SocketTimeoutException e){
+                if(responseHandler != null) {
+                    responseHandler.sendFailureMessage(e, "socket time out");
+                }
+                return;
             } catch (IOException e) {
                 cause = e;
                 retry = retryHandler.retryRequest(cause, ++executionCount, context);

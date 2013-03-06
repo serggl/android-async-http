@@ -29,12 +29,13 @@ import java.net.ConnectException;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.HashSet;
+import java.util.Iterator;
 
-import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLException;
 
 import org.apache.http.NoHttpResponseException;
-import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.HttpRequestRetryHandler;
+import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.protocol.ExecutionContext;
 import org.apache.http.protocol.HttpContext;
 
@@ -61,7 +62,7 @@ class RetryHandler implements HttpRequestRetryHandler {
         // never retry timeouts
         exceptionBlacklist.add(InterruptedIOException.class);
         // never retry SSL handshake failures
-        exceptionBlacklist.add(SSLHandshakeException.class);
+        exceptionBlacklist.add(SSLException.class);
     }
 
     private final int maxRetries;
@@ -71,7 +72,7 @@ class RetryHandler implements HttpRequestRetryHandler {
     }
 
     public boolean retryRequest(IOException exception, int executionCount, HttpContext context) {
-        boolean retry;
+        boolean retry = true;
 
         Boolean b = (Boolean) context.getAttribute(ExecutionContext.HTTP_REQ_SENT);
         boolean sent = (b != null && b.booleanValue());
@@ -81,25 +82,22 @@ class RetryHandler implements HttpRequestRetryHandler {
             // Do not retry if over max retry count
             retry = false;
             Log.d(LOG_TAG, "maxRetries!");
-        } else if (exceptionBlacklist.contains(exception.getClass())) {
+        } else if (isInList(exceptionBlacklist, exception)) {
             // immediately cancel retry if the error is blacklisted
             retry = false;
-        } else if (exceptionWhitelist.contains(exception.getClass())) {
+        } else if (isInList(exceptionWhitelist, exception)) {
             // immediately retry if error is whitelisted
             retry = true;
         } else if (!sent) {
             // for most other errors, retry only if request hasn't been fully sent yet
         	retry = true;
-        } else {
+        }
+
+        if(retry) {
             // resend all idempotent requests
-        	HttpUriRequest currentReq = (HttpUriRequest) context.getAttribute(ExecutionContext.HTTP_REQUEST);
+            HttpUriRequest currentReq = (HttpUriRequest) context.getAttribute( ExecutionContext.HTTP_REQUEST );
             String requestType = currentReq.getMethod();
-            if(!requestType.equals("POST")) {
-                retry = true;
-            } else {
-                // otherwise do not retry
-                retry = false;
-            }
+            retry = !requestType.equals("POST");
         }
 
         if(retry) {
@@ -109,5 +107,15 @@ class RetryHandler implements HttpRequestRetryHandler {
         }
         
         return retry;
+    }
+    
+    protected boolean isInList(HashSet<Class<?>> list, Throwable error) {
+    	Iterator<Class<?>> itr = list.iterator();
+    	while (itr.hasNext()) {
+    		if (itr.next().isInstance(error)) {
+    			return true;
+    		}
+    	}
+    	return false;
     }
 }

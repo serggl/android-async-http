@@ -18,6 +18,7 @@
 
 package com.loopj.android.http;
 
+import org.apache.http.HttpStatus;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -61,6 +62,29 @@ public class JsonHttpResponseHandler extends AsyncHttpResponseHandler {
      */
     public void onSuccess(JSONArray response) {}
 
+    /**
+     * Fired when a request returns successfully and contains a json object
+     * at the base of the response string. Override to handle in your
+     * own code.
+     * @param statusCode the status code of the response
+     * @param response the parsed json object found in the server response (if any)
+     */
+    public void onSuccess(int statusCode, JSONObject response) {
+        onSuccess(response);
+    }
+
+
+    /**
+     * Fired when a request returns successfully and contains a json array
+     * at the base of the response string. Override to handle in your
+     * own code.
+     * @param statusCode the status code of the response
+     * @param response the parsed json array found in the server response (if any)
+     */
+    public void onSuccess(int statusCode, JSONArray response) {
+        onSuccess(response);
+    }
+
     public void onFailure(Throwable e, JSONObject errorResponse) {}
     public void onFailure(Throwable e, JSONArray errorResponse) {}
 
@@ -70,13 +94,17 @@ public class JsonHttpResponseHandler extends AsyncHttpResponseHandler {
     //
 
     @Override
-    protected void sendSuccessMessage(String responseBody) {
-        try {
-            Object jsonResponse = parseResponse(responseBody);
-            sendMessage(obtainMessage(SUCCESS_JSON_MESSAGE, jsonResponse));
-        } catch(JSONException e) {
-            sendFailureMessage(e, responseBody);
-        }
+    protected void sendSuccessMessage(int statusCode, String responseBody) {
+    	if (statusCode != HttpStatus.SC_NO_CONTENT){
+	        try {
+	            Object jsonResponse = parseResponse(responseBody);
+	            sendMessage(obtainMessage(SUCCESS_JSON_MESSAGE, new Object[]{statusCode, jsonResponse}));
+	        } catch(JSONException e) {
+	            sendFailureMessage(e, responseBody);
+	        }
+    	}else{
+    		sendMessage(obtainMessage(SUCCESS_JSON_MESSAGE, new Object[]{statusCode, new JSONObject()}));
+    	}
     }
 
 
@@ -88,31 +116,35 @@ public class JsonHttpResponseHandler extends AsyncHttpResponseHandler {
     protected void handleMessage(Message msg) {
         switch(msg.what){
             case SUCCESS_JSON_MESSAGE:
-                handleSuccessJsonMessage(msg.obj);
+                Object[] response = (Object[]) msg.obj;
+                handleSuccessJsonMessage(((Integer) response[0]).intValue(), response[1]);
                 break;
             default:
                 super.handleMessage(msg);
         }
     }
 
-    protected void handleSuccessJsonMessage(Object jsonResponse) {
+    protected void handleSuccessJsonMessage(int statusCode, Object jsonResponse) {
         if(jsonResponse instanceof JSONObject) {
-            onSuccess((JSONObject)jsonResponse);
+            onSuccess(statusCode, (JSONObject)jsonResponse);
         } else if(jsonResponse instanceof JSONArray) {
-            onSuccess((JSONArray)jsonResponse);
+            onSuccess(statusCode, (JSONArray)jsonResponse);
         } else {
-            onFailure(new JSONException("Unexpected type " + jsonResponse.getClass().getName()));
+            onFailure(new JSONException("Unexpected type " + jsonResponse.getClass().getName()), (JSONObject)null);
         }
     }
 
     protected Object parseResponse(String responseBody) throws JSONException {
         Object result = null;
         //trim the string to prevent start with blank, and test if the string is valid JSON, because the parser don't do this :(. If Json is not valid this will return null
-	responseBody = responseBody.trim();
-	if(responseBody.startsWith("{") || responseBody.startsWith("[")) {
-	    result = new JSONTokener(responseBody).nextValue();
-	}
-	return result;
+		responseBody = responseBody.trim();
+		if(responseBody.startsWith("{") || responseBody.startsWith("[")) {
+			result = new JSONTokener(responseBody).nextValue();
+		}
+		if (result == null) {
+			result = responseBody;
+		}
+		return result;
     }
 
     @Override

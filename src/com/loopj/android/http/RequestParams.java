@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +58,7 @@ public class RequestParams {
 
     protected ConcurrentHashMap<String, String> urlParams;
     protected ConcurrentHashMap<String, FileWrapper> fileParams;
+    protected ConcurrentHashMap<String, ArrayList<String>> urlParamsWithArray;
 
     /**
      * Constructs a new empty <code>RequestParams</code> instance.
@@ -91,6 +93,25 @@ public class RequestParams {
     }
 
     /**
+     * Constructs a new RequestParams instance and populate it with multiple
+     * initial key/value string param.
+     * @param keysAndValues a sequence of keys and values. Objects are
+     * automatically converted to Strings (including the value {@code null}).
+     * @throws IllegalArgumentException if the number of arguments isn't even.
+     */
+    public RequestParams(Object... keysAndValues) {
+      init();
+      int len = keysAndValues.length;
+      if (len % 2 != 0)
+        throw new IllegalArgumentException("Supplied arguments must be even");
+      for (int i = 0; i < len; i += 2) {
+        String key = String.valueOf(keysAndValues[i]);
+        String val = String.valueOf(keysAndValues[i + 1]);
+        put(key, val);
+      }
+    }
+
+    /**
      * Adds a key/value string pair to the request.
      * @param key the key name for the new param.
      * @param value the value string for the new param.
@@ -108,6 +129,17 @@ public class RequestParams {
      */
     public void put(String key, File file) throws FileNotFoundException {
         put(key, new FileInputStream(file), file.getName());
+    }
+
+    /**
+     * Adds param with more than one value.
+     * @param key the key name for the new param.
+     * @param values is the ArrayList with values for the param.
+     */
+    public void put(String key, ArrayList<String> values)  {
+        if(key != null && values != null) {
+            urlParamsWithArray.put(key, values);
+        }
     }
 
     /**
@@ -149,6 +181,7 @@ public class RequestParams {
     public void remove(String key){
         urlParams.remove(key);
         fileParams.remove(key);
+        urlParamsWithArray.remove(key);
     }
 
     @Override
@@ -172,6 +205,20 @@ public class RequestParams {
             result.append("FILE");
         }
 
+        for(ConcurrentHashMap.Entry<String, ArrayList<String>> entry : urlParamsWithArray.entrySet()) {
+            if(result.length() > 0)
+                result.append("&");
+
+            ArrayList<String> values = entry.getValue();
+            for (String value : values) {
+                if (values.indexOf(value) != 0)
+                    result.append("&");
+                result.append(entry.getKey());
+                result.append("=");
+                result.append(value);
+            }
+        }
+
         return result.toString();
     }
 
@@ -187,6 +234,14 @@ public class RequestParams {
             // Add string params
             for(ConcurrentHashMap.Entry<String, String> entry : urlParams.entrySet()) {
                 multipartEntity.addPart(entry.getKey(), entry.getValue());
+            }
+
+            // Add dupe params
+            for(ConcurrentHashMap.Entry<String, ArrayList<String>> entry : urlParamsWithArray.entrySet()) {
+                ArrayList<String> values = entry.getValue();
+                for (String value : values) {
+                    multipartEntity.addPart(entry.getKey(), value);
+                }
             }
 
             // Add file params
@@ -220,6 +275,7 @@ public class RequestParams {
     private void init(){
         urlParams = new ConcurrentHashMap<String, String>();
         fileParams = new ConcurrentHashMap<String, FileWrapper>();
+        urlParamsWithArray = new ConcurrentHashMap<String, ArrayList<String>>();
     }
 
     protected List<BasicNameValuePair> getParamsList() {
@@ -227,6 +283,13 @@ public class RequestParams {
 
         for(ConcurrentHashMap.Entry<String, String> entry : urlParams.entrySet()) {
             lparams.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
+        }
+
+        for(ConcurrentHashMap.Entry<String, ArrayList<String>> entry : urlParamsWithArray.entrySet()) {
+            ArrayList<String> values = entry.getValue();
+            for (String value : values) {
+                lparams.add(new BasicNameValuePair(entry.getKey(), value));
+            }
         }
 
         return lparams;
