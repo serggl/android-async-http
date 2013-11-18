@@ -76,7 +76,6 @@ class RetryHandler implements HttpRequestRetryHandler {
 
         Boolean b = (Boolean) context.getAttribute(ExecutionContext.HTTP_REQ_SENT);
         boolean sent = (b != null && b.booleanValue());
-        Log.d(LOG_TAG, "retry request...");
 
         if(executionCount > maxRetries) {
             // Do not retry if over max retry count
@@ -94,10 +93,14 @@ class RetryHandler implements HttpRequestRetryHandler {
         }
 
         if(retry) {
+        	Log.d(LOG_TAG, "RETRYING FAILED REQUEST (" + exception.toString() + ")");
             // resend all idempotent requests
             HttpUriRequest currentReq = (HttpUriRequest) context.getAttribute( ExecutionContext.HTTP_REQUEST );
-            String requestType = currentReq.getMethod();
-            retry = !requestType.equals("POST");
+            if (currentReq != null) {
+            	String requestType = currentReq.getMethod();
+            	retry = !requestType.equals("POST");
+            }
+            retry = false;
         }
 
         if(retry) {

@@ -1,5 +1,7 @@
 package com.loopj.android.http;
 
+import java.io.InputStream;
+
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.protocol.HttpContext;
@@ -14,12 +16,16 @@ public abstract class SyncHttpClient extends AsyncHttpClient {
 	 * the result back to this method. Therefore the result object has to be a
 	 * field to be accessible
 	 */
-	private String result;
-	AsyncHttpResponseHandler responseHandler = new AsyncHttpResponseHandler() {
+	private Object result;
+	AsyncHttpResponseHandler responseHandler = new StreamHttpResponseHandler() {
 
 		void sendResponseMessage(org.apache.http.HttpResponse response) {
 			responseCode = response.getStatusLine().getStatusCode();
 			super.sendResponseMessage(response);
+		};
+		
+		protected Object parseStream(InputStream stream) {
+			return parseResponseStream(stream);
 		};
 
 		@Override
@@ -32,15 +38,17 @@ public abstract class SyncHttpClient extends AsyncHttpClient {
 		}
 
 		@Override
-		public void onSuccess(String content) {
+		public void onSuccess(Object content) {
 			result = content;
 		}
 
 		@Override
-		public void onFailure(Throwable error, String content) {
+		public void onFailure(Throwable error, Object content) {
 			result = onRequestFailed(error, content);
 		}
 	};
+	
+	protected abstract Object parseResponseStream(InputStream stream);
 
 	/**
 	 * @return the response code for the last request, might be usefull
@@ -66,7 +74,7 @@ public abstract class SyncHttpClient extends AsyncHttpClient {
 				.run();
 	}
 
-	public abstract String onRequestFailed(Throwable error, String content);
+	public abstract Object onRequestFailed(Throwable error, Object content);
 
 	public void delete(String url, RequestParams queryParams,
 			AsyncHttpResponseHandler responseHandler) {
@@ -74,7 +82,7 @@ public abstract class SyncHttpClient extends AsyncHttpClient {
 		delete(url, responseHandler);
 	}
 
-	public String get(String url, RequestParams params) {
+	public Object get(String url, RequestParams params) {
 		this.get(url, params, responseHandler);
 		/*
 		 * the response handler will have set the result when this line is
@@ -83,37 +91,37 @@ public abstract class SyncHttpClient extends AsyncHttpClient {
 		return result;
 	}
 
-	public String get(String url) {
+	public Object get(String url) {
 		this.get(url, null, responseHandler);
 		return result;
 	}
 
-	public String put(String url, RequestParams params) {
+	public Object put(String url, RequestParams params) {
 		this.put(url, params, responseHandler);
 		return result;
 	}
 
-	public String put(String url) {
+	public Object put(String url) {
 		this.put(url, null, responseHandler);
 		return result;
 	}
 
-	public String post(String url, RequestParams params) {
+	public Object post(String url, RequestParams params) {
 		this.post(url, params, responseHandler);
 		return result;
 	}
 
-	public String post(String url) {
+	public Object post(String url) {
 		this.post(url, null, responseHandler);
 		return result;
 	}
 
-	public String delete(String url, RequestParams params) {
+	public Object delete(String url, RequestParams params) {
 		this.delete(url, params, responseHandler);
 		return result;
 	}
 
-	public String delete(String url) {
+	public Object delete(String url) {
 		this.delete(url, null, responseHandler);
 		return result;
 	}
