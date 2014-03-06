@@ -15,7 +15,7 @@ dependencies {
     compile fileTree(dir: 'libs', include: '*.jar')
 }
 
-version '1.0.1'
+version '1.0.2'
 group 'com.anjlab.android'
 
 android {

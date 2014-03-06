@@ -62,6 +62,11 @@ public class StreamHttpResponseHandler extends AsyncHttpResponseHandler {
 
     public void onFailure(Throwable e, Object errorResponse) {}
 
+    @Override
+    public void onFailure(Throwable error, String content) {
+        onFailure(error, (Object)content);
+    }
+
     protected void handleParsedMessage(int statusCode, Object responseBody) {
         onSuccess(statusCode, responseBody);
     }
